@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 import FileUploader from './components/FileUploader';
 import EmailBodyRenderer from './components/EmailBodyRenderer';
@@ -16,6 +16,7 @@ interface UsageInfo {
   estimated_cost: string;
 }
 
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
 // Copy rendered content helper
 const copyRenderedContent = (ref: React.RefObject<HTMLDivElement | null>) => {
@@ -48,6 +49,11 @@ const copyRenderedContent = (ref: React.RefObject<HTMLDivElement | null>) => {
 };
 
 export default function Home() {
+  // Auth state
+  const [user, setUser] = useState<{id: number; username: string} | null>(null);
+  const [authMessage, setAuthMessage] = useState<string>('');
+
+  // Email generation state
   const [transcript, setTranscript] = useState('');
   const [config, setConfig] = useState({
     tone: 'professional',
@@ -59,23 +65,82 @@ export default function Home() {
   const [generating, setGenerating] = useState(false);
   const [usage, setUsage] = useState<UsageInfo | null>(null);
 
-  // Ref for rendered email body container
+  // Input fields for login
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+
+  // Ref for email body container
   const emailBodyRef = useRef<HTMLDivElement>(null);
 
+  // Check auth status on mount
+  useEffect(() => {
+    fetch(`${apiBaseUrl}/auth/status`, {
+      credentials: 'include', // Include cookies for authentication
+    })
+      .then(res => {
+        if (res.ok) return res.json();
+        throw new Error('Not authenticated');
+      })
+      .then(data => {
+        setUser(data.user);
+      })
+      .catch(() => setUser(null));
+  }, []);
+  
+
+  // Login handler
+  const login = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthMessage('');
+    try {
+      const res = await fetch(`${apiBaseUrl}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: loginUsername, password: loginPassword }),
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUser(data.user);
+        setLoginUsername('');
+        setLoginPassword('');
+      } else {
+        setAuthMessage(data.error || 'Login failed.');
+      }
+    } catch {
+      setAuthMessage('Login failed. Please try again.');
+    }
+  };
+
+  // Logout handler
+  const logout = async () => {
+    try {
+      await fetch(`${apiBaseUrl}/logout`, { method: 'POST' });
+      setUser(null);
+      setGeneratedEmail(null);
+      setUsage(null);
+      setTranscript('');
+      setAuthMessage('');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      setAuthMessage('Logout failed. Please try again.');
+    }
+  };
+
+  // Email generation
   const generateEmail = async () => {
     if (!transcript.trim()) {
       alert('Please provide a transcript first.');
       return;
     }
-
     setGenerating(true);
     try {
-      const response = await fetch('/api/generate-email', {
+      const response = await fetch(`${apiBaseUrl}/api/generate-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transcript, ...config }),
+        credentials: 'include',
       });
-
       const result = await response.json();
       if (result.success) {
         setGeneratedEmail(result.email);
@@ -91,13 +156,59 @@ export default function Home() {
     }
   };
 
+  if (!user) {
+    // Show login form if not authenticated
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
+        <div className="bg-gray-800 p-8 rounded-lg w-full max-w-md shadow-md">
+          <h2 className="text-2xl font-bold mb-6 text-gray-100 text-center">Member Login</h2>
+          <form onSubmit={login} className="space-y-4">
+            <input
+              type="text"
+              placeholder="Username"
+              value={loginUsername}
+              onChange={e => setLoginUsername(e.target.value)}
+              required
+              className="w-full p-3 rounded bg-gray-900 text-gray-100 border border-gray-700"
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={loginPassword}
+              onChange={e => setLoginPassword(e.target.value)}
+              required
+              className="w-full p-3 rounded bg-gray-900 text-gray-100 border border-gray-700"
+            />
+            <button
+              type="submit"
+              className="w-full bg-blue-600 py-3 rounded font-semibold text-white hover:bg-blue-700 transition"
+            >
+              Login
+            </button>
+          </form>
+          {authMessage && <p className="mt-4 text-red-500 text-center">{authMessage}</p>}
+        </div>
+      </div>
+    );
+  }
+
+  // Show main app if authenticated
   return (
+    
     <div className="min-h-screen bg-gray-900 py-12 px-4 text-gray-100">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold mb-4">Minutes of the Meeting Generator</h1>
-          <p className="text-xl text-gray-400">Made by Rufi • Powered by AI</p>
+        <div className="flex justify-between items-center mb-12">
+          <div>
+            <h1 className="text-4xl font-bold mb-2">Minutes of the Meeting Generator</h1>
+            <p className="text-xl text-gray-400">Made by Rufi • Powered by AI</p>
+          </div>
+          <button
+            onClick={logout}
+            className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded font-semibold"
+          >
+            Logout
+          </button>
         </div>
 
         {/* Upload Section */}

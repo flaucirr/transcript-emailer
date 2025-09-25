@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Team Login</title>
+    <style>
+        /* Dark mode styles */
+        body {
+            background-color: #121212;
+            color: #e0e0e0;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #login-container {
+            background-color: #1e1e1e;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
+            width: 320px;
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.3rem;
+            font-weight: bold;
+            color: #bbbbbb;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 0.5rem;
+            margin-bottom: 1rem;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background-color: #2b2b2b;
+            color: #e0e0e0;
+        }
+
+        input[type="text"]::placeholder,
+        input[type="password"]::placeholder {
+            color: #777;
+        }
+
+        button {
+            width: 100%;
+            padding: 0.7rem;
+            background-color: #4a90e2;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #357abd;
+        }
+
+        #message {
+            margin-top: 1rem;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        #app-content {
+            text-align: center;
+        }
+
+        #logout-btn {
+            margin-top: 1rem;
+            padding: 0.5rem 1rem;
+            background-color: #e03e3e;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        #logout-btn:hover {
+            background-color: #b33030;
+        }
+    </style>
+</head>
+<body>
+    <div id="login-container">
+        <h2>Team Member Login</h2>
+        <form id="login-form">
+            <div>
+                <label for="username">Username:</label>
+                <input type="text" id="username" required placeholder="Enter username">
+            </div>
+            <div>
+                <label for="password">Password:</label>
+                <input type="password" id="password" required placeholder="Enter password">
+            </div>
+            <button type="submit">Login</button>
+        </form>
+        <div id="message"></div>
+    </div>
+
+    <div id="app-content" style="display: none;">
+        <h2>Welcome to the Team App</h2>
+        <p>Hello, <span id="username-display"></span>!</p>
+        <button id="logout-btn">Logout</button>
+    </div>
+
+    <script>
+        // Check if user is already logged in
+        fetch('/auth/status')
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                }
+                throw new Error('Not authenticated');
+            })
+            .then(data => {
+                showApp(data.user.username);
+            })
+            .catch(() => {
+                showLogin();
+            });
+
+        function showLogin() {
+            document.getElementById('login-container').style.display = 'block';
+            document.getElementById('app-content').style.display = 'none';
+        }
+
+        function showApp(username) {
+            document.getElementById('login-container').style.display = 'none';
+            document.getElementById('app-content').style.display = 'block';
+            document.getElementById('username-display').textContent = username;
+        }
+
+        // Login form handler
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password }),
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showApp(data.user.username);
+                    document.getElementById('message').textContent = '';
+                } else {
+                    document.getElementById('message').textContent = data.error;
+                    document.getElementById('message').style.color = 'red';
+                }
+            } catch (error) {
+                document.getElementById('message').textContent = 'Login failed. Please try again.';
+                document.getElementById('message').style.color = 'red';
+            }
+        });
+
+        // Logout handler
+        document.getElementById('logout-btn').addEventListener('click', async () => {
+            try {
+                await fetch('/logout', { method: 'POST' });
+                showLogin();
+                document.getElementById('login-form').reset();
+                document.getElementById('message').textContent = '';
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        });
+    </script>
+</body>
+</html>
