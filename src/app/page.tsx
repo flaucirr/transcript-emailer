@@ -37,7 +37,7 @@ const copyRenderedContent = (ref: React.RefObject<HTMLDivElement | null>) => {
     selection?.removeAllRanges();
 
     if (success) {
-      alert('Email copied to clipboard with formatting!');
+      alert('Email copied to clipboard!');
     } else {
       alert('Copy failed - please try selecting manually.');
     }
